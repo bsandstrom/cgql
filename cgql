@@ -3,9 +3,13 @@
 source ~/.cgql
 
 # Usage check
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-  echo "Usage: $0 <graphql-file> [variables-json-file]"
+if [ $# -gt 2 ]; then
+  echo "Usage: $0 [graphql-file] [variables-json-file]"
   exit 1
+fi
+
+if [ $# -eq 0 ]; then
+  set -- "."
 fi
 
 if [ -d "$1" ]; then
@@ -26,7 +30,7 @@ if [ -d "$1" ]; then
     exit 1
   fi
   VARIABLES="${json_files[0]:+$(cat "${json_files[0]}")}"
-  VARIABLES="${VARIABLES:-{}}"
+  VARIABLES="${VARIABLES:-{\}}"
 else
   GQL_FILE="$1"
   if [ ! -f "$GQL_FILE" ]; then
@@ -53,4 +57,4 @@ curl "$CGQL_URL" \
   -H 'Content-Type: application/json' \
   "${HEADER_ARGS[@]}" \
   -d "$(jq -n --arg query "$(cat "$GQL_FILE")" --argjson variables "$VARIABLES" '{"query": $query, "variables": $variables}')" \
-| jq
+| jq | less
