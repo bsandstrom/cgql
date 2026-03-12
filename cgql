@@ -1,0 +1,56 @@
+#!/bin/bash
+
+source ~/.cgql
+
+# Usage check
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  echo "Usage: $0 <graphql-file> [variables-json-file]"
+  exit 1
+fi
+
+if [ -d "$1" ]; then
+  DIR="$1"
+  mapfile -t gql_files < <(ls "$DIR"/*.graphql 2>/dev/null)
+  if [ ${#gql_files[@]} -eq 0 ]; then
+    echo "Error: No .graphql file found in '$DIR'."
+    exit 1
+  elif [ ${#gql_files[@]} -gt 1 ]; then
+    echo "Error: Multiple .graphql files found in '$DIR', be specific."
+    exit 1
+  fi
+  GQL_FILE="${gql_files[0]}"
+
+  mapfile -t json_files < <(ls "$DIR"/*.json 2>/dev/null)
+  if [ ${#json_files[@]} -gt 1 ]; then
+    echo "Error: Multiple .json files found in '$DIR', be specific."
+    exit 1
+  fi
+  VARIABLES="${json_files[0]:+$(cat "${json_files[0]}")}"
+  VARIABLES="${VARIABLES:-{}}"
+else
+  GQL_FILE="$1"
+  if [ ! -f "$GQL_FILE" ]; then
+    echo "Error: File '$GQL_FILE' not found."
+    exit 1
+  fi
+
+  VARIABLES="{}"
+  if [ -n "$2" ]; then
+    if [ ! -f "$2" ]; then
+      echo "Error: Variables file '$2' not found."
+      exit 1
+    fi
+    VARIABLES="$(cat "$2")"
+  fi
+fi
+
+HEADER_ARGS=()
+for h in "${CGQL_HEADERS[@]}"; do
+  HEADER_ARGS+=(-H "$h")
+done
+
+curl "$CGQL_URL" \
+  -H 'Content-Type: application/json' \
+  "${HEADER_ARGS[@]}" \
+  -d "$(jq -n --arg query "$(cat "$GQL_FILE")" --argjson variables "$VARIABLES" '{"query": $query, "variables": $variables}')" \
+| jq
